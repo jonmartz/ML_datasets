@@ -51,10 +51,10 @@ class Parser:
             'dataset version',
             'AUC',
             'accuracy',
-            'confirmed recall',
             'confirmed precision',
-            'rejected recall',
+            'confirmed recall',
             'rejected precision',
+            'rejected recall',
             'threshold',
             'model',
         ]
@@ -71,10 +71,10 @@ class Parser:
         n_true_positive_rej = matrix[idx_rej][idx_rej]
         return (
             (n_true_positive_conf + n_true_positive_rej) / total,  # accuracy
-            n_true_positive_conf / n_true_conf,  # confirmed recall
             n_true_positive_conf / n_pred_conf,  # confirmed precision
-            n_true_positive_rej / n_true_rej,  # rejected recall
+            n_true_positive_conf / n_true_conf,  # confirmed recall
             n_true_positive_rej / n_pred_rej,  # rejected precision
+            n_true_positive_rej / n_true_rej,  # rejected recall
         )
 
 
