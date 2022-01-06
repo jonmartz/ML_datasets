@@ -1,14 +1,12 @@
 import os
-from typing import Iterator, Optional, List
+from typing import Optional, List
 
 import pandas as pd
 
-RESULTS_DIR = 'cv_results'
+from constants import *
 
-CONFIRMED = 'Confirmed'
-REJECTED = 'Rejected'
 
-class Parser:
+class H2OParser:
     def __init__(self):
         self._lines: Optional[List[str]] = None
         self._line_idx: int = 0
@@ -27,16 +25,19 @@ class Parser:
             self._line_idx += 1
         return self._lines[self._line_idx]
 
-    def parse(self):
+    def create_cv_summary(self):
+        """
+        Write a summary of all the CV results.
+        """
         rows = []
-        for version in os.listdir(RESULTS_DIR):
-            version_dir = f'{RESULTS_DIR}/{version}'
-            for sub_version in os.listdir(version_dir):
-                with open(f'{version_dir}/{sub_version}') as f:
-                    row = [f'{version} - {sub_version.rpartition(".")[0]}']
+        for dataset_name in os.listdir(DATASETS):
+            output_dir = f'{DATASETS}/{dataset_name}/{OUTPUT}'
+            for version in os.listdir(output_dir):
+                with open(f'{output_dir}/{version}/{CV_RESULTS}.txt') as f:
                     self.lines = f.readlines()
                     self.continue_to_line_with('** Reported on cross-validation data. **')
                     model = self._lines[self._line_idx - 1][:-1]
+                    row = [dataset_name, version.rpartition(".")[0], model]
                     line = self.continue_to_line_with('AUC: ')
                     row.append(float(line.partition(' ')[-1]))
                     matrix_info = self.continue_to_line_with('Confusion Matrix (Act/Pred)')
@@ -45,10 +46,12 @@ class Parser:
                     matrix_row_1 = [float(i) for i in self._lines[self._line_idx + 2].split('\t')[2:-2]]
                     matrix_row_2 = [float(i) for i in self._lines[self._line_idx + 3].split('\t')[2:-2]]
                     row.extend(self.parse_matrix(matrix_header, [matrix_row_1, matrix_row_2]))
-                    row.extend((threshold, model))
+                    row.append(threshold)
                     rows.append(row)
         header = [
-            'dataset version',
+            'dataset',
+            'version',
+            'model',
             'AUC',
             'accuracy',
             'confirmed precision',
@@ -56,11 +59,14 @@ class Parser:
             'rejected precision',
             'rejected recall',
             'threshold',
-            'model',
         ]
-        pd.DataFrame(rows, columns=header).to_csv('report.csv', index=False)
+        if not os.path.exists(CV_SUMMARIES):
+            os.makedirs(CV_SUMMARIES)
+        n_summaries = len(os.listdir(CV_SUMMARIES))
+        pd.DataFrame(rows, columns=header).to_csv(f'cv_summary_{n_summaries + 1}.csv', index=False)
 
-    def parse_matrix(self, header, matrix: list) -> tuple:
+    @staticmethod
+    def parse_matrix(header, matrix: list) -> tuple:
         idx_conf, idx_rej = (0, 1) if header[0] == CONFIRMED else (1, 0)
         total = sum(sum(r) for r in matrix)
         n_true_conf = sum(matrix[idx_conf])
@@ -79,4 +85,4 @@ class Parser:
 
 
 if __name__ == '__main__':
-    Parser().parse()
+    H2OParser().create_cv_summary()
