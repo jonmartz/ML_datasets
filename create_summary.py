@@ -31,22 +31,16 @@ class H2OParser:
         """
         rows = []
         for dataset_name in os.listdir(DATASETS):
+            if dataset_name == 'test':
+                continue
             output_dir = f'{DATASETS}/{dataset_name}/{OUTPUT}'
             for version in os.listdir(output_dir):
                 with open(f'{output_dir}/{version}/{CV_RESULTS}.txt') as f:
                     self.lines = f.readlines()
-                    self.continue_to_line_with('** Reported on cross-validation data. **')
-                    model = self._lines[self._line_idx - 1][:-1]
-                    row = [dataset_name, version.rpartition(".")[0], model]
-                    line = self.continue_to_line_with('AUC: ')
-                    row.append(float(line.partition(' ')[-1]))
-                    matrix_info = self.continue_to_line_with('Confusion Matrix (Act/Pred)')
-                    threshold = float(matrix_info.split(' ')[-1][:-2])
-                    matrix_header = self._lines[self._line_idx + 1].split('\t')[:-2]
-                    matrix_row_1 = [float(i) for i in self._lines[self._line_idx + 2].split('\t')[2:-2]]
-                    matrix_row_2 = [float(i) for i in self._lines[self._line_idx + 3].split('\t')[2:-2]]
-                    row.extend(self.parse_matrix(matrix_header, [matrix_row_1, matrix_row_2]))
-                    row.append(threshold)
+                    if dataset_name == 'rules':
+                        row = self._parse_rules()
+                    else:
+                        row = self._parse_h2o_output(dataset_name, version)
                     rows.append(row)
         header = [
             'dataset',
@@ -63,7 +57,29 @@ class H2OParser:
         if not os.path.exists(CV_SUMMARIES):
             os.makedirs(CV_SUMMARIES)
         n_summaries = len(os.listdir(CV_SUMMARIES))
-        pd.DataFrame(rows, columns=header).to_csv(f'cv_summary_{n_summaries + 1}.csv', index=False)
+        pd.DataFrame(rows, columns=header).to_csv(f'{CV_SUMMARIES}/cv_summary_{n_summaries + 1}.csv', index=False)
+
+    def _parse_h2o_output(self, dataset_name, version):
+        self.continue_to_line_with('** Reported on cross-validation data. **')
+        model = self._lines[self._line_idx - 1][:-1]
+        row = [dataset_name, version, model]
+        line = self.continue_to_line_with('AUC: ')
+        row.append(float(line.partition(' ')[-1]))
+        matrix_info = self.continue_to_line_with('Confusion Matrix (Act/Pred)')
+        threshold = float(matrix_info.split(' ')[-1][:-2])
+        matrix_header = self._lines[self._line_idx + 1].split('\t')[:-2]
+        matrix_row_1 = [float(i) for i in self._lines[self._line_idx + 2].split('\t')[2:-2]]
+        matrix_row_2 = [float(i) for i in self._lines[self._line_idx + 3].split('\t')[2:-2]]
+        row.extend(self.parse_matrix(matrix_header, [matrix_row_1, matrix_row_2]))
+        return row + [threshold]
+
+    def _parse_rules(self):
+        row = ['rules', '(maybe = rejected)', '', '', ]
+        matrix_header = self._lines[self._line_idx].strip().split('\t')
+        matrix_row_1 = [float(i) for i in self._lines[self._line_idx + 1].strip().split('\t')]
+        matrix_row_2 = [float(i) for i in self._lines[self._line_idx + 2].strip().split('\t')]
+        row.extend(self.parse_matrix(matrix_header, [matrix_row_1, matrix_row_2]))
+        return row + ['']
 
     @staticmethod
     def parse_matrix(header, matrix: list) -> tuple:
