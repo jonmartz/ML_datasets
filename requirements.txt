@@ -1,3 +1,4 @@
 -e git+https://readonly73822@bitbucket.org/cyberpion_projects/cybmodules.git#egg=cybmodules
+-e git+https://readonly73822@bitbucket.org/cyberpion_projects/ml_utils.git#egg=ml_utils
 h2o~=3.34.0.7
 pandas~=1.3.1
